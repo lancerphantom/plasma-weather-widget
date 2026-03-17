@@ -12,7 +12,6 @@ PlasmoidItem {
     property var weatherData: null
     property string errorText: ""
 
-    // Map WMO weather codes to KDE icon names
     function weatherIcon(code) {
         if (code === undefined || code === null) return "weather-clear"
         switch (code) {
@@ -48,7 +47,6 @@ PlasmoidItem {
         }
     }
 
-    // Map WMO weather codes to readable descriptions
     function weatherDescription(code) {
         if (code === undefined || code === null) return "Unknown"
         switch (code) {
@@ -109,15 +107,17 @@ PlasmoidItem {
     }
 
     function fetchWeather() {
+        var lat = plasmoid.configuration.latitude
+        var lon = plasmoid.configuration.longitude
         var url = "https://api.open-meteo.com/v1/forecast"
-            + "?latitude=9.98&longitude=76.28"
+            + "?latitude=" + lat + "&longitude=" + lon
             + "&current=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m"
             + "&timezone=auto"
         executable.exec("curl -s '" + url + "'")
     }
 
     Timer {
-        interval: 600000
+        interval: plasmoid.configuration.updateInterval * 60000
         running: true
         repeat: true
         triggeredOnStart: true
@@ -158,13 +158,12 @@ PlasmoidItem {
         spacing: Kirigami.Units.largeSpacing
 
         PlasmaComponents.Label {
-            text: "Kochi, Kerala"
+            text: plasmoid.configuration.cityName
             font.bold: true
             font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.3
             Layout.alignment: Qt.AlignHCenter
         }
 
-        // Weather icon in popup
         Kirigami.Icon {
             source: {
                 if (root.weatherData && root.weatherData.current) {
@@ -177,7 +176,6 @@ PlasmoidItem {
             Layout.alignment: Qt.AlignHCenter
         }
 
-        // Condition description
         PlasmaComponents.Label {
             text: {
                 if (root.weatherData && root.weatherData.current) {
@@ -203,7 +201,7 @@ PlasmoidItem {
         }
     }
 
-    toolTipMainText: "Weather Widget"
+    toolTipMainText: plasmoid.configuration.cityName
     toolTipSubText: {
         if (root.weatherData && root.weatherData.current) {
             var c = root.weatherData.current
