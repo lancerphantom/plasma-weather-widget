@@ -1,0 +1,17 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "You"
+            }
+        ],
+        "Category": "Weather",
+        "Description": "A weather widget powered by Open-Meteo",
+        "Icon": "weather-clear",
+        "Id": "com.github.weather-widget",
+        "Name": "Weather Widget",
+        "Version": "1"
+    },
+    "KPackageStructure": "Plasma/Applet",
+    "X-Plasma-API-Minimum-Version": "6.0"
+}
