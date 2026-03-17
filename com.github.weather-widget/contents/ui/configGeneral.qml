@@ -9,22 +9,28 @@ Item {
     width: childrenRect.width
     height: childrenRect.height
 
+    property string title: i18n("General")
+
     property alias cfg_cityName: cityField.text
     property alias cfg_latitude: latField.text
     property alias cfg_longitude: lonField.text
     property alias cfg_updateInterval: intervalSpinBox.value
+
+    property string cfg_cityNameDefault: "Kochi, Kerala"
+    property string cfg_latitudeDefault: "9.98"
+    property string cfg_longitudeDefault: "76.28"
+    property int cfg_updateIntervalDefault: 10
 
     property var searchResults: []
     property bool isSearching: false
     property bool userIsTyping: false
     property var activeRequest: null
 
-    Component.onCompleted {
+    Component.onCompleted: {
         var xhr = new XMLHttpRequest()
         xhr.open("GET", "https://geocoding-api.open-meteo.com/v1/search?name=test&count=1")
         xhr.send()
     }
-
 
     Timer {
         id: debounce
@@ -35,12 +41,9 @@ Item {
                 searchResults = []
                 return
             }
-
-            // Abort previous request
             if (page.activeRequest) {
                 page.activeRequest.abort()
             }
-
             isSearching = true
             var xhr = new XMLHttpRequest()
             page.activeRequest = xhr
