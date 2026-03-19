@@ -218,8 +218,8 @@ PlasmoidItem {
 
     // --- Full (popup) representation ---
     fullRepresentation: ColumnLayout {
-        Layout.preferredWidth: Kirigami.Units.gridUnit * 22
-        Layout.minimumWidth: Kirigami.Units.gridUnit * 18
+        Layout.preferredWidth: Kirigami.Units.gridUnit * 16
+        Layout.minimumWidth: Kirigami.Units.gridUnit * 14
         spacing: Kirigami.Units.largeSpacing
 
         PlasmaComponents.Label {
@@ -246,7 +246,9 @@ PlasmoidItem {
                 text: plasmoid.configuration.cityName
                 font.bold: true
                 font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.4
-                Layout.alignment: Qt.AlignHCenter
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
             }
 
             RowLayout {
@@ -353,8 +355,8 @@ PlasmoidItem {
                     ? root.weatherData.daily.time.length : 0
 
                 delegate: ColumnLayout {
-                    Layout.preferredWidth: Kirigami.Units.gridUnit * 4
-                    Layout.maximumWidth: Kirigami.Units.gridUnit * 4
+                    Layout.preferredWidth: Kirigami.Units.gridUnit * 3
+                    Layout.maximumWidth: Kirigami.Units.gridUnit * 3
                     spacing: Kirigami.Units.smallSpacing / 2
 
                     PlasmaComponents.Label {
