@@ -12,6 +12,58 @@ PlasmoidItem {
     property var weatherData: null
     property string errorText: ""
 
+    // Day/night from sunrise-sunset; falls back to hour-based guess
+    property bool isDay: {
+        if (root.weatherData && root.weatherData.daily
+                && root.weatherData.daily.sunrise
+                && root.weatherData.daily.sunrise.length > 0) {
+            var now = new Date()
+            var sunrise = new Date(root.weatherData.daily.sunrise[0])
+            var sunset  = new Date(root.weatherData.daily.sunset[0])
+            return now >= sunrise && now < sunset
+        }
+        var h = new Date().getHours()
+        return h >= 6 && h < 20
+    }
+
+    // Returns a Lottie JSON path — day/night aware for codes that have variants
+    function lottieIcon(code, dayTime) {
+        var d = dayTime ? "day" : "night"
+        if (code === undefined || code === null) return Qt.resolvedUrl("icons/clear-" + d + ".png")
+        switch (code) {
+            case 0:  return Qt.resolvedUrl("icons/clear-" + d + ".png")
+            case 1:
+            case 2:  return Qt.resolvedUrl("icons/partly-cloudy-" + d + ".png")
+            case 3:  return Qt.resolvedUrl("icons/overcast-" + d + ".png")
+            case 45:
+            case 48: return Qt.resolvedUrl("icons/fog-" + d + ".png")
+            case 51:
+            case 53:
+            case 55: return Qt.resolvedUrl("icons/drizzle.png")
+            case 56:
+            case 57: return Qt.resolvedUrl("icons/sleet.png")
+            case 61:
+            case 63:
+            case 65: return Qt.resolvedUrl("icons/overcast-" + d + "-rain.png")
+            case 66:
+            case 67: return Qt.resolvedUrl("icons/sleet.png")
+            case 71:
+            case 73:
+            case 75:
+            case 77: return Qt.resolvedUrl("icons/overcast-" + d + "-snow.png")
+            case 80:
+            case 81:
+            case 82: return Qt.resolvedUrl("icons/overcast-" + d + "-rain.png")
+            case 85:
+            case 86: return Qt.resolvedUrl("icons/overcast-" + d + "-snow.png")
+            case 95: return Qt.resolvedUrl("icons/thunderstorms-" + d + "-rain.png")
+            case 96:
+            case 99: return Qt.resolvedUrl("icons/hail.png")
+            default: return Qt.resolvedUrl("icons/clear-" + d + ".png")
+        }
+    }
+
+    // KDE icon names — used only in compact panel representation
     function weatherIcon(code) {
         if (code === undefined || code === null) return "weather-clear"
         switch (code) {
@@ -122,16 +174,15 @@ PlasmoidItem {
         var url = "https://api.open-meteo.com/v1/forecast"
             + "?latitude=" + lat + "&longitude=" + lon
             + "&current=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,apparent_temperature"
-            + "&daily=temperature_2m_max,temperature_2m_min,weather_code"
+            + "&daily=temperature_2m_max,temperature_2m_min,weather_code,sunrise,sunset"
             + "&forecast_days=5"
             + "&timezone=auto"
         executable.exec("curl -s '" + url + "'")
     }
 
-    // Re-fetch when location changes
     Connections {
         target: plasmoid.configuration
-        function onLatitudeChanged() { fetchWeather() }
+        function onLatitudeChanged()  { fetchWeather() }
         function onLongitudeChanged() { fetchWeather() }
     }
 
@@ -143,41 +194,34 @@ PlasmoidItem {
         onTriggered: fetchWeather()
     }
 
+    // --- Compact (panel) representation — static KDE icon + temperature ---
     compactRepresentation: RowLayout {
         Kirigami.Icon {
-            source: {
-                if (root.weatherData && root.weatherData.current) {
-                    return root.weatherIcon(root.weatherData.current.weather_code)
-                }
-                return "weather-clear"
-            }
+            source: root.weatherData && root.weatherData.current
+                ? root.weatherIcon(root.weatherData.current.weather_code)
+                : "weather-clear"
             Layout.fillHeight: true
             Layout.preferredWidth: height
         }
         PlasmaComponents.Label {
-            text: {
-                if (root.weatherData && root.weatherData.current) {
-                    return Math.round(root.weatherData.current.temperature_2m) + "°"
-                }
-                return "..."
-            }
+            text: root.weatherData && root.weatherData.current
+                ? Math.round(root.weatherData.current.temperature_2m) + "°"
+                : "..."
             Layout.fillHeight: true
             verticalAlignment: Text.AlignVCenter
         }
-
         MouseArea {
             anchors.fill: parent
             onClicked: root.expanded = !root.expanded
         }
     }
 
+    // --- Full (popup) representation ---
     fullRepresentation: ColumnLayout {
         Layout.preferredWidth: Kirigami.Units.gridUnit * 22
-        Layout.preferredHeight: Kirigami.Units.gridUnit * 22
         Layout.minimumWidth: Kirigami.Units.gridUnit * 18
         spacing: Kirigami.Units.largeSpacing
 
-        // Error state
         PlasmaComponents.Label {
             text: "Error: " + root.errorText
             visible: root.errorText !== ""
@@ -185,7 +229,6 @@ PlasmoidItem {
             Layout.alignment: Qt.AlignHCenter
         }
 
-        // Loading state
         PlasmaComponents.Label {
             text: "Loading..."
             visible: !root.weatherData && root.errorText === ""
@@ -193,13 +236,12 @@ PlasmoidItem {
             opacity: 0.6
         }
 
-        // --- Current weather section ---
+        // --- Current weather ---
         ColumnLayout {
             visible: root.weatherData && root.weatherData.current
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
 
-            // City name
             PlasmaComponents.Label {
                 text: plasmoid.configuration.cityName
                 font.bold: true
@@ -207,17 +249,19 @@ PlasmoidItem {
                 Layout.alignment: Qt.AlignHCenter
             }
 
-            // Big icon + temperature row
             RowLayout {
                 Layout.alignment: Qt.AlignHCenter
                 spacing: Kirigami.Units.largeSpacing
 
-                Kirigami.Icon {
-                    source: root.weatherData && root.weatherData.current
-                        ? root.weatherIcon(root.weatherData.current.weather_code)
-                        : "weather-clear"
-                    Layout.preferredWidth: Kirigami.Units.gridUnit * 5
-                    Layout.preferredHeight: Kirigami.Units.gridUnit * 5
+                // Main animated weather icon
+                AnimatedWeatherIcon {
+                    weatherCode: root.weatherData && root.weatherData.current
+                        ? root.weatherData.current.weather_code : 0
+                    isDay: root.isDay
+                    Layout.preferredWidth: Kirigami.Units.gridUnit * 6
+                    Layout.preferredHeight: Kirigami.Units.gridUnit * 6
+                    width: Kirigami.Units.gridUnit * 6
+                    height: Kirigami.Units.gridUnit * 6
                 }
 
                 ColumnLayout {
@@ -238,7 +282,6 @@ PlasmoidItem {
                 }
             }
 
-            // Feels like
             PlasmaComponents.Label {
                 text: root.weatherData && root.weatherData.current
                     ? "Feels like " + Math.round(root.weatherData.current.apparent_temperature) + "°C"
@@ -247,7 +290,6 @@ PlasmoidItem {
                 Layout.alignment: Qt.AlignHCenter
             }
 
-            // Divider
             Rectangle {
                 Layout.fillWidth: true
                 Layout.topMargin: Kirigami.Units.smallSpacing
@@ -257,7 +299,7 @@ PlasmoidItem {
                 opacity: 0.15
             }
 
-            // Detail row: humidity + wind
+            // Wind + humidity
             RowLayout {
                 Layout.alignment: Qt.AlignHCenter
                 spacing: Kirigami.Units.gridUnit * 2
@@ -271,8 +313,7 @@ PlasmoidItem {
                     }
                     PlasmaComponents.Label {
                         text: root.weatherData && root.weatherData.current
-                            ? root.weatherData.current.wind_speed_10m + " km/h"
-                            : ""
+                            ? root.weatherData.current.wind_speed_10m + " km/h" : ""
                         opacity: 0.8
                     }
                 }
@@ -286,15 +327,13 @@ PlasmoidItem {
                     }
                     PlasmaComponents.Label {
                         text: root.weatherData && root.weatherData.current
-                            ? root.weatherData.current.relative_humidity_2m + "%"
-                            : ""
+                            ? root.weatherData.current.relative_humidity_2m + "%" : ""
                         opacity: 0.8
                     }
                 }
             }
         }
 
-        // Divider before forecast
         Rectangle {
             visible: root.weatherData && root.weatherData.daily
             Layout.fillWidth: true
@@ -306,7 +345,7 @@ PlasmoidItem {
         // --- 5-day forecast ---
         RowLayout {
             visible: root.weatherData && root.weatherData.daily
-            Layout.fillWidth: true
+            Layout.alignment: Qt.AlignHCenter
             spacing: 0
 
             Repeater {
@@ -314,43 +353,44 @@ PlasmoidItem {
                     ? root.weatherData.daily.time.length : 0
 
                 delegate: ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: Kirigami.Units.smallSpacing
+                    Layout.preferredWidth: Kirigami.Units.gridUnit * 4
+                    Layout.maximumWidth: Kirigami.Units.gridUnit * 4
+                    spacing: Kirigami.Units.smallSpacing / 2
 
                     PlasmaComponents.Label {
                         text: root.weatherData
-                            ? root.dayName(root.weatherData.daily.time[index])
-                            : ""
+                            ? root.dayName(root.weatherData.daily.time[index]) : ""
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         font.bold: index === 0
                         Layout.alignment: Qt.AlignHCenter
                         opacity: index === 0 ? 1.0 : 0.8
+                        elide: Text.ElideRight
                     }
 
-                    Kirigami.Icon {
-                        source: root.weatherData
-                            ? root.weatherIcon(root.weatherData.daily.weather_code[index])
-                            : "weather-clear"
-                        Layout.preferredWidth: Kirigami.Units.iconSizes.medium
-                        Layout.preferredHeight: Kirigami.Units.iconSizes.medium
+                    // Forecast icons — animated, always day variant
+                    AnimatedWeatherIcon {
+                        weatherCode: root.weatherData
+                            ? root.weatherData.daily.weather_code[index] : 0
+                        isDay: true
+                        width: Kirigami.Units.iconSizes.large
+                        height: Kirigami.Units.iconSizes.large
+                        Layout.preferredWidth: Kirigami.Units.iconSizes.large
+                        Layout.preferredHeight: Kirigami.Units.iconSizes.large
                         Layout.alignment: Qt.AlignHCenter
                     }
 
                     PlasmaComponents.Label {
                         text: root.weatherData
-                            ? Math.round(root.weatherData.daily.temperature_2m_max[index]) + "°"
-                            : ""
+                            ? Math.round(root.weatherData.daily.temperature_2m_max[index]) + "°" : ""
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
-                        font.bold: index === 0
+                        font.bold: true
                         Layout.alignment: Qt.AlignHCenter
                     }
 
                     PlasmaComponents.Label {
                         text: root.weatherData
-                            ? Math.round(root.weatherData.daily.temperature_2m_min[index]) + "°"
-                            : ""
+                            ? Math.round(root.weatherData.daily.temperature_2m_min[index]) + "°" : ""
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
-                        font.bold: index === 0
                         Layout.alignment: Qt.AlignHCenter
                         opacity: 0.5
                     }
@@ -358,9 +398,61 @@ PlasmoidItem {
             }
         }
 
-        // Spacer to push content up
-        Item {
-            Layout.fillHeight: true
+        Rectangle {
+            visible: root.weatherData && root.weatherData.daily
+            Layout.fillWidth: true
+            height: 1
+            color: Kirigami.Theme.textColor
+            opacity: 0.15
+        }
+
+        // --- Sunrise / Sunset ---
+        RowLayout {
+            visible: root.weatherData && root.weatherData.daily
+                && root.weatherData.daily.sunrise
+                && root.weatherData.daily.sunrise.length > 0
+            Layout.fillWidth: true
+            Layout.bottomMargin: Kirigami.Units.smallSpacing
+
+            Item { Layout.fillWidth: true }
+
+            RowLayout {
+                spacing: Kirigami.Units.smallSpacing
+                Kirigami.Icon {
+                    source: "weather-clear"
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                }
+                PlasmaComponents.Label {
+                    text: {
+                        if (!root.weatherData || !root.weatherData.daily || !root.weatherData.daily.sunrise) return ""
+                        return Qt.formatTime(new Date(root.weatherData.daily.sunrise[0]), "h:mm AP")
+                    }
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    opacity: 0.8
+                }
+            }
+
+            Item { Layout.fillWidth: true }
+
+            RowLayout {
+                spacing: Kirigami.Units.smallSpacing
+                Kirigami.Icon {
+                    source: "weather-clear-night"
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                }
+                PlasmaComponents.Label {
+                    text: {
+                        if (!root.weatherData || !root.weatherData.daily || !root.weatherData.daily.sunset) return ""
+                        return Qt.formatTime(new Date(root.weatherData.daily.sunset[0]), "h:mm AP")
+                    }
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    opacity: 0.8
+                }
+            }
+
+            Item { Layout.fillWidth: true }
         }
     }
 

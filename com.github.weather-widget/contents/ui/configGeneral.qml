@@ -27,14 +27,16 @@ Item {
     property var activeRequest: null
 
     Component.onCompleted: {
+        // Pre-warm the connection so first real search is fast
         var xhr = new XMLHttpRequest()
-        xhr.open("GET", "https://geocoding-api.open-meteo.com/v1/search?name=test&count=1")
+        xhr.open("GET", "https://geocoding-api.open-meteo.com/v1/search?name=a&count=1&language=en")
+        xhr.onreadystatechange = function() {}
         xhr.send()
     }
 
     Timer {
         id: debounce
-        interval: 200
+        interval: 300
         onTriggered: {
             var query = cityField.text.trim()
             if (query.length < 3) {
@@ -103,11 +105,19 @@ Item {
                 onPressed: userIsTyping = true
             }
 
-            QQC2.BusyIndicator {
+            RowLayout {
                 visible: page.isSearching
-                running: visible
-                Layout.preferredWidth: Kirigami.Units.gridUnit * 2
-                Layout.preferredHeight: Kirigami.Units.gridUnit * 2
+                spacing: Kirigami.Units.smallSpacing
+                QQC2.BusyIndicator {
+                    running: true
+                    Layout.preferredWidth: Kirigami.Units.gridUnit * 1.5
+                    Layout.preferredHeight: Kirigami.Units.gridUnit * 1.5
+                }
+                QQC2.Label {
+                    text: i18n("Searching…")
+                    opacity: 0.7
+                    font: Kirigami.Theme.smallFont
+                }
             }
 
             Rectangle {
@@ -159,22 +169,26 @@ Item {
         QQC2.TextField {
             id: latField
             Kirigami.FormData.label: i18n("Latitude:")
-            placeholderText: "9.98"
+            placeholderText: i18n("Auto-filled from city search")
             inputMethodHints: Qt.ImhFormattedNumbersOnly
+            readOnly: true
+            opacity: 0.7
         }
 
         QQC2.TextField {
             id: lonField
             Kirigami.FormData.label: i18n("Longitude:")
-            placeholderText: "76.28"
+            placeholderText: i18n("Auto-filled from city search")
             inputMethodHints: Qt.ImhFormattedNumbersOnly
+            readOnly: true
+            opacity: 0.7
         }
 
         QQC2.SpinBox {
             id: intervalSpinBox
             Kirigami.FormData.label: i18n("Update interval (minutes):")
             from: 1
-            to: 120
+            to: 100
         }
     }
 }
